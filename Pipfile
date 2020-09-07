@@ -10,6 +10,7 @@ django = "==2.2"
 pandas = "*"
 selenium = "*"
 djangorestframework = "*"
+pyvirtualdisplay = "*"
 
 [requires]
 python_version = "3.8"
