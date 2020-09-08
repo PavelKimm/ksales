@@ -6,6 +6,7 @@ from .models import Airport, Flight, Carrier, GroundTransportation
 from .serializers import AirportSerializer, FlightSerializer, CarrierSerializer
 from datetime import datetime
 from datetime import timedelta
+import re
 
 from time import sleep
 from selenium import webdriver
@@ -13,14 +14,32 @@ from selenium import webdriver
 options = webdriver.ChromeOptions()
 options.add_argument('headless')
 chromedriver_path = '/usr/local/bin/chromedriver'
-driver = webdriver.Chrome(executable_path=chromedriver_path, options=options)
+# driver = webdriver.Chrome(executable_path=chromedriver_path, options=options)
 
 
 @api_view(["POST"])
 def purify_database(request):
     flights = Flight.objects.all()
     for flight in flights:
-        flight
+        # q = flight.duration
+        # q = "1 ч 40 м"
+        # q1 = q.split()[::2]
+        # q2 = q.split()[1::2]
+        #
+        # print(q1, q2)
+        # exit()
+        flight.price = re.sub("[^0-9]", "", flight.price)
+        flight.save()
+        if flight.price == '':
+            flight.delete()
+
+    trains = GroundTransportation.objects.all()
+    for train in trains:
+        train.price = re.sub("[^0-9]", "", train.price)
+        train.save()
+        if train.price == '':
+            train.delete()
+    return Response(status=HTTP_200_OK)
 
 
 @api_view(["POST"])

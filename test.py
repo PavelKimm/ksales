@@ -5,6 +5,9 @@ import smtplib
 from email.mime.multipart import MIMEMultipart
 
 
+
+
+
 def flights_scrape():
     try:
         xp_flight_info = '//div[contains(@class,"offers-groups-item")]'
