@@ -23,6 +23,7 @@ class Carrier(models.Model):
 class Airport(models.Model):
     IATA_code = models.CharField(max_length=3, unique=True)
     city_name = models.CharField(max_length=128)
+    railway_station_code = models.CharField(max_length=10, unique=True, blank=True, null=True)
 
     def __str__(self):
         return self.city_name
@@ -31,7 +32,21 @@ class Airport(models.Model):
 class Flight(models.Model):
     city_from = models.ForeignKey(to=Airport, on_delete=models.CASCADE, related_name='flights_from')
     city_to = models.ForeignKey(to=Airport, on_delete=models.CASCADE, related_name='flights_to')
-    date_start = models.CharField(max_length=10)
+    depart_date = models.CharField(max_length=10)
     duration = models.CharField(max_length=10)
-    price = models.FloatField()
-    carrier = models.ForeignKey(to=Carrier, on_delete=models.CASCADE)
+    price = models.CharField(max_length=15)
+    carrier = models.ForeignKey(to=Carrier, on_delete=models.CASCADE, blank=True, null=True)
+    number_of_changes = models.PositiveIntegerField(blank=True, null=True)
+    provider = models.CharField(max_length=100, blank=True, null=True)
+    distance = models.PositiveIntegerField(blank=True, null=True)
+
+
+class GroundTransportation(models.Model):
+    city_from = models.ForeignKey(to=Airport, on_delete=models.CASCADE, related_name='trains_from')
+    city_to = models.ForeignKey(to=Airport, on_delete=models.CASCADE, related_name='trains_to')
+    available_tickets = models.PositiveIntegerField(blank=True, null=True)
+    seat_type = models.CharField(max_length=20, blank=True, null=True)
+    train_number = models.CharField(max_length=20, blank=True, null=True)
+    depart_date = models.CharField(max_length=10)
+    duration = models.CharField(max_length=10)
+    price = models.CharField(max_length=15)
