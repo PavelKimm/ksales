@@ -5,69 +5,69 @@ import smtplib
 from email.mime.multipart import MIMEMultipart
 
 
-
 def flights_scrape():
     try:
-        xp_airline_sections = '//div[contains(@class,"logos single  ")]'
+        xp_flight_info = '//div[contains(@class,"offers-groups-item")]'
+
+        xp_airline_sections = xp_flight_info + '//span[contains(@data-qa-id,"offer__airline-name")]'
         airline_elements = driver.find_elements_by_xpath(xp_airline_sections)
         if airline_elements:
-            airline_titles = airline_elements
+            airline_titles = [title.text for title in airline_elements]
         else:
-            airline_titles = 'no flights'
+            airline_titles = None
 
-        xp_price_sections = '//p[contains(@class,"fare-families-choose-price")]'
-        price_elements = driver.find_elements_by_xpath(xp_price_sections)
-        if price_elements:
-            prices = [''.join(price.text[3:-4].split()) for price in price_elements]
+        xp_depart_time_sections = xp_flight_info + '//div[contains(@data-qa-id,"offer__dep-time")]'
+        depart_time_elements = driver.find_elements_by_xpath(xp_depart_time_sections)
+        if depart_time_elements:
+            depart_time_list = [time.text for time in depart_time_elements]
         else:
-            prices = 'no flights'
+            depart_time_list = None
 
-        xp_duration_sections = '//p[contains(@class,"duration time_0")]'
-        duration_elements = driver.find_elements_by_xpath(xp_duration_sections)
+        xp_price_sections = driver.find_elements_by_xpath(xp_flight_info + '//div[contains(@class,"p-3 rounded-r-sm")]'
+                                                                           '//div[contains(@class,"offers-group-prices")]')
+        prices = [''.join(a.text.split('\n')[-2].split()[1:-1]) if '\nAviata' in a.text
+                  else ''.join(a.text.split('\n')[0].split()[:-1]) for a in xp_price_sections[::3]]
+
+        xp_duration_sections = '//div[contains(@class,"offers-groups-item-body")]' \
+                               '//div[contains(@class,"text-center text-gray")]'
+        duration_elements = driver.find_elements_by_xpath(xp_flight_info + xp_duration_sections)
         if duration_elements:
             durations = [duration.text for duration in duration_elements]
         else:
-            durations = 'no flights'
+            durations = None
 
+        return zip(airline_titles, depart_time_list, prices, durations)
 
-
-        print(len(prices), '==', len(durations), 'must be equal')
-        # print(airline_titles)
-        # print(len(airline_titles))
-
-        # return prices, durations#, airline_titles
-
-        if prices == 'no flights' or durations == 'no flights':
-            return None
-        else:
-            return zip(prices, durations)
     except Exception as e:
         print(e)
 
+
 try:
-    # options = webdriver.ChromeOptions()
-    # options.add_argument('headless')
+    options = webdriver.ChromeOptions()
+    options.add_argument('headless')
     chromedriver_path = '/usr/local/bin/chromedriver'
-    #
+
     driver = webdriver.Chrome(executable_path=chromedriver_path)  # , options=options)
 
-    date_start = '11092020'
+    date_start = '12092020'
 
-    chocotravel = ('https://www.chocotravel.com/ru/search?dest=2708001-CIT-2708001&searchresult=1&is_refundable_only=0#params=2708001CIT:18092020:2:1-0-0-0:3:0')
-    driver.get(chocotravel)
-    sleep(3)
-    print('starting scrape.....')
-    results = flights_scrape()
-    # while not results:
-    #     results = flights_scrape()
-    # for price, duration in results:
-    #     print(price, duration)
-    #     city_from = Airport.objects.get(IATA_code=IATA_from)
-    #     city_to = Airport.objects.get(IATA_code=IATA_to)
-    #     # FIXME
-    #     carrier = Carrier.objects.get(name='Fly Arystan')
-    #     Flight.objects.create(city_from=city_from, city_to=city_to, depart_date=date_start,
-    #                           duration=duration, price=price, carrier=carrier)
+    str_from = 'ALA'
+    str_to = 'TSE'
+    year = '2020'
+    month = '09'
+    day = '09'
+    seat_class = 'E'
+    for i in range(2):
+        chocotravel = f'https://aviata.kz/aviax/search/{str_from}-{str_to}{year}{month}{day}1000{seat_class}'
+        driver.get(chocotravel)
+        sleep(11)
+        print('starting scrape.....')
+        results = flights_scrape()
+
+        for i, result in enumerate(results):
+            airline_title, depart_time, price, duration = result
+            print(i, airline_title, depart_time, price, duration)
+        day = '10'
 
 finally:
     driver.quit()

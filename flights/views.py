@@ -1,90 +1,76 @@
-from django.http import JsonResponse
 from rest_framework import generics
 from rest_framework.decorators import api_view
 from rest_framework.status import HTTP_400_BAD_REQUEST, HTTP_200_OK, HTTP_401_UNAUTHORIZED, HTTP_404_NOT_FOUND
 from rest_framework.response import Response
 from .models import Airport, Flight, Carrier, GroundTransportation
 from .serializers import AirportSerializer, FlightSerializer, CarrierSerializer
-import requests
-import json
 from datetime import datetime
 from datetime import timedelta
 
-from time import sleep, strftime
+from time import sleep
 from selenium import webdriver
-from selenium.webdriver.common.keys import Keys
-import smtplib
-from email.mime.multipart import MIMEMultipart
 
-# options = webdriver.ChromeOptions()
-# options.add_argument('headless')
+options = webdriver.ChromeOptions()
+options.add_argument('headless')
 chromedriver_path = '/usr/local/bin/chromedriver'
-#
-# driver = webdriver.Chrome(executable_path=chromedriver_path)  # , options=options)
-
-
-@api_view(["GET"])
-def get_data(request):
-    airports = Airport.objects.all()
-    headers = {'X-Access-Token': '6fee0f66347517eed229b6e7632e237b'}
-
-    for airport_from in airports:
-        for airport_to in airports:
-            if airport_from != airport_to:
-                IATA_from = airport_from.IATA_code
-                IATA_to = airport_to.IATA_code
-                date = datetime.now().date()
-                for i in range(60):
-                    depart_date = str(date)
-                    res = requests.get(
-                        f"http://min-prices.aviasales.ru/calendar_preload?origin={IATA_from}&destination={IATA_to}&depart_date={depart_date}&one_way=true&currency=KZT",
-                        headers=headers)
-                    try:
-                        flights = json.loads(res.text)['best_prices']
-                        for flight in flights:
-                            if flight['depart_date'] == depart_date:
-                                Flight.objects.create(city_from=airport_from, city_to=airport_to,
-                                                      depart_date=depart_date,
-                                                      number_of_changes=flight['number_of_changes'],
-                                                      price=flight['value'],
-                                                      provider=flight['gate'], distance=flight['distance'])
-                    except:
-                        print(res.text)
-                        break
-                    date += timedelta(days=1)
-    return Response(status=HTTP_200_OK)
+driver = webdriver.Chrome(executable_path=chromedriver_path, options=options)
 
 
 @api_view(["POST"])
-def add_data_to_db(request):
-    try:
-        # airports = Airport.objects.all()
-        #     for airport_from in airports:
-        #         for airport_to in airports:
-        #             if airport_from != airport_to:
-        #                 IATA_from = airport_from.IATA_code
-        #                 IATA_to = airport_to.IATA_code
-        #                 print(IATA_from, IATA_to)
-        #
-        #                 date_start = '11092020'
-        #
-        #                 chocotravel = ('https://www.chocotravel.com/ru/search?dest=' + IATA_from + '-' + IATA_to +
-        #                                '#params=' + IATA_from + IATA_to + ':' + date_start + ':2:1-0-0-0:3:0')
-        #                 driver.get(chocotravel)
-        #                 sleep(3)
-        #                 print('starting scrape.....')
-        #                 results = flights_scrape()
-        #                 while not results:
-        #                     results = flights_scrape()
-        #                 for price, duration in results:
-        #                     print(price, duration)
-        #                     city_from = Airport.objects.get(IATA_code=IATA_from)
-        #                     city_to = Airport.objects.get(IATA_code=IATA_to)
-        #                     # FIXME
-        #                     carrier = Carrier.objects.get(name='Fly Arystan')
-        #                     Flight.objects.create(city_from=city_from, city_to=city_to, depart_date=date_start,
-        #                                           duration=duration, price=price, carrier=carrier)
+def purify_database(request):
+    flights = Flight.objects.all()
+    for flight in flights:
+        flight
 
+
+@api_view(["POST"])
+def add_plane_data_to_db(request):
+    try:
+        airports = Airport.objects.all()
+        for airport_from in airports:
+            for airport_to in airports:
+                if airport_from != airport_to:
+                    IATA_from = airport_from.IATA_code
+                    IATA_to = airport_to.IATA_code
+                    date = datetime.now().date()
+
+                    for i in range(60):
+                        depart_date = ''.join(str(date).split('-'))
+                        for c in range(2):
+                            if c == 0:
+                                seat_class = 'E'
+                            else:
+                                seat_class = 'B'
+                            try:
+                                chocotravel = f'https://aviata.kz/aviax/search/{IATA_from}-{IATA_to}{depart_date}1000{seat_class}'
+                                driver.get(chocotravel)
+                                sleep(14)
+                                if seat_class == 'E':
+                                    seat_class = 'Economy'
+                                else:
+                                    seat_class = 'Business'
+                                print('starting scrape.....')
+                                results = flights_scrape()
+
+                                for result in results:
+                                    airline_title, depart_time, price, duration = result
+
+                                    Flight.objects.create(city_from=airport_from, city_to=airport_to,
+                                                          depart_date=''.join(str(date).split('-')[::-1]),
+                                                          duration=duration, price=price, carrier=airline_title,
+                                                          seat_class=seat_class)
+                            except:
+                                continue
+                        date += timedelta(days=1)
+        return Response(status=HTTP_200_OK)
+
+    finally:
+        driver.quit()
+
+
+@api_view(["POST"])
+def add_train_data_to_db(request):
+    try:
         airports = Airport.objects.all()
         for airport_from in airports:
             for airport_to in airports:
@@ -162,44 +148,41 @@ def trains_scrape():
         return None
 
 
-
 def flights_scrape():
     try:
-        xp_price_sections = '//p[contains(@class,"fare-families-choose-price")]'
-        price_elements = driver.find_elements_by_xpath(xp_price_sections)
-        if price_elements:
-            prices = [''.join(price.text[3:-4].split()) for price in price_elements]
-        else:
-            prices = 'no flights'
+        xp_flight_info = '//div[contains(@class,"offers-groups-item")]'
 
-        xp_duration_sections = '//p[contains(@class,"duration time_0")]'
-        duration_elements = driver.find_elements_by_xpath(xp_duration_sections)
+        xp_airline_sections = xp_flight_info + '//span[contains(@data-qa-id,"offer__airline-name")]'
+        airline_elements = driver.find_elements_by_xpath(xp_airline_sections)
+        if airline_elements:
+            airline_titles = [title.text for title in airline_elements]
+        else:
+            airline_titles = None
+
+        xp_depart_time_sections = xp_flight_info + '//div[contains(@data-qa-id,"offer__dep-time")]'
+        depart_time_elements = driver.find_elements_by_xpath(xp_depart_time_sections)
+        if depart_time_elements:
+            depart_time_list = [time.text for time in depart_time_elements]
+        else:
+            depart_time_list = None
+
+        xp_price_sections = driver.find_elements_by_xpath(xp_flight_info + '//div[contains(@class,"p-3 rounded-r-sm")]'
+                                                                           '//div[contains(@class,"offers-group-prices")]')
+        prices = [''.join(a.text.split('\n')[-2].split()[1:-1]) if '\nAviata' in a.text
+                  else ''.join(a.text.split('\n')[0].split()[:-1]) for a in xp_price_sections[::3]]
+
+        xp_duration_sections = '//div[contains(@class,"offers-groups-item-body")]' \
+                               '//div[contains(@class,"text-center text-gray")]'
+        duration_elements = driver.find_elements_by_xpath(xp_flight_info + xp_duration_sections)
         if duration_elements:
             durations = [duration.text for duration in duration_elements]
         else:
-            durations = 'no flights'
+            durations = None
 
-        # xp_airline_sections = '//div[contains(@class,"airline")]'
-        # airline_elements = driver.find_elements_by_xpath(xp_airline_sections)
-        # if airline_elements:
-        #     airline_titles = [airline.find_element_by_xpath(
-        #         "//img[contains(@src,'https://www.chocotravel.com/media/images/logo')]"
-        #     ).get_attribute("title") for airline in airline_elements]
-        # else:
-        #     airline_titles = 'no flights'
+        return zip(airline_titles, depart_time_list, prices, durations)
 
-        print(len(prices), '==', len(durations), 'must be equal')
-        # print(airline_titles)
-        # print(len(airline_titles))
-
-        # return prices, durations#, airline_titles
-
-        if prices == 'no flights' or durations == 'no flights':
-            return None
-        else:
-            return zip(prices, durations)
     except Exception as e:
-        return Response({"message": str(e)}, status=HTTP_400_BAD_REQUEST)
+        print(e)
 
 
 class FlightView(generics.ListAPIView):
@@ -208,4 +191,3 @@ class FlightView(generics.ListAPIView):
     def get_queryset(self):
         queryset = Flight.objects.filter(carrier__type='AP')
         return queryset[:10]
-

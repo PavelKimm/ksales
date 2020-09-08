@@ -35,10 +35,8 @@ class Flight(models.Model):
     depart_date = models.CharField(max_length=10)
     duration = models.CharField(max_length=10)
     price = models.CharField(max_length=15)
-    carrier = models.ForeignKey(to=Carrier, on_delete=models.CASCADE, blank=True, null=True)
-    number_of_changes = models.PositiveIntegerField(blank=True, null=True)
-    provider = models.CharField(max_length=100, blank=True, null=True)
-    distance = models.PositiveIntegerField(blank=True, null=True)
+    carrier = models.CharField(max_length=100)
+    seat_class = models.CharField(max_length=20)
 
 
 class GroundTransportation(models.Model):
